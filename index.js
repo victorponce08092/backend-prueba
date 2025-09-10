@@ -34,10 +34,23 @@ async function getCredentials(workspaceId, provider) {
 }
 
 // ---------- REST: Integraciones (connect / test / disconnect / status) ----------
+async function getUserIdFromAuth(req) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return null;
+
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data?.user) return null;
+
+  return data.user.id; // 👈 user_id real de Supabase
+}
+
 
 // Conectar / guardar credenciales { workspaceId, credentials }
 app.post("/api/integrations/:provider/connect", async (req, res) => {
   try {
+    const userId = await getUserIdFromAuth(req);
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
     const { provider } = req.params;
     const { workspaceId, credentials } = req.body;
 
@@ -47,15 +60,18 @@ app.post("/api/integrations/:provider/connect", async (req, res) => {
     const { error } = await supabase.from("integrations").upsert({
       workspace_id: workspaceId,
       provider,
-      credentials, // JSON (PhoneNumberID, tokens, verify_token, etc.)
+      credentials,
+      user_id: userId, // 👈 se guarda automáticamente ligado al dueño real
     });
-    if (error) throw error;
 
+    if (error) throw error;
     res.json({ status: "connected" });
   } catch (e) {
     res.status(500).json({ message: e.message || "Server error" });
   }
 });
+
+
 
 // Probar integración { workspaceId, ...opcional: action, webhookUrl }
 app.post("/api/integrations/:provider/test", async (req, res) => {
