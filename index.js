@@ -9,7 +9,7 @@ import twilio from "twilio";
 import crypto from "crypto";
 
 const allowedOrigins = [
-  "http://localhost:3001",   // tu frontend local
+  "http://localhost:5001",   // tu frontend local
 ];
 
 
