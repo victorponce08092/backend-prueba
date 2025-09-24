@@ -5,18 +5,24 @@ import bodyParser from "body-parser";
 import fetch from "node-fetch";
 import { createClient } from "@supabase/supabase-js";
 import cors from "cors";
+import twilio from "twilio";
+import crypto from "crypto";
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true })); // Para Twilio webhooks (x-www-form-urlencoded)
 
 dotenv.config();
 
 // ---------- Supabase ----------
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
 // Helpers
-const PROVIDERS = ["telegram"];
+const PROVIDERS = ["telegram", "twilio"];
 
 async function getCredentials(workspaceId, provider) {
   const { data, error } = await supabase
@@ -30,7 +36,6 @@ async function getCredentials(workspaceId, provider) {
   return data.credentials;
 }
 
-// ---------- REST: Integraciones (connect / test / disconnect / status) ----------
 async function getUserIdFromAuth(req) {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return null;
@@ -41,7 +46,7 @@ async function getUserIdFromAuth(req) {
   return data.user.id;
 }
 
-// Conectar / guardar credenciales
+// ---------- REST: Integraciones ----------
 app.post("/api/integrations/:provider/connect", async (req, res) => {
   try {
     const userId = await getUserIdFromAuth(req);
@@ -50,8 +55,10 @@ app.post("/api/integrations/:provider/connect", async (req, res) => {
     const { provider } = req.params;
     const { workspaceId, credentials } = req.body;
 
-    if (!PROVIDERS.includes(provider)) return res.status(400).json({ message: "Invalid provider" });
-    if (!workspaceId || !credentials) return res.status(400).json({ message: "Missing data" });
+    if (!PROVIDERS.includes(provider))
+      return res.status(400).json({ message: "Invalid provider" });
+    if (!workspaceId || !credentials)
+      return res.status(400).json({ message: "Missing data" });
 
     const { error } = await supabase.from("integrations").upsert({
       workspace_id: workspaceId,
@@ -67,51 +74,88 @@ app.post("/api/integrations/:provider/connect", async (req, res) => {
   }
 });
 
-// Probar integración
 app.post("/api/integrations/:provider/test", async (req, res) => {
   try {
     const { provider } = req.params;
     const { workspaceId, action, webhookUrl } = req.body || {};
 
-    if (!PROVIDERS.includes(provider)) return res.status(400).json({ message: "Invalid provider" });
-    if (!workspaceId) return res.status(400).json({ message: "Missing workspaceId" });
+    if (!PROVIDERS.includes(provider))
+      return res.status(400).json({ message: "Invalid provider" });
+    if (!workspaceId)
+      return res.status(400).json({ message: "Missing workspaceId" });
 
     const creds = await getCredentials(workspaceId, provider);
     if (!creds) return res.status(400).json({ message: "Not connected" });
 
-    // --- Telegram ---
-    const token = creds.bot_token;
-    if (!token) return res.status(400).json({ message: "Missing bot_token" });
+    // --- Telegram test ---
+    if (provider === "telegram") {
+      const token = creds.bot_token;
+      if (!token) return res.status(400).json({ message: "Missing bot_token" });
 
-    if (action === "setWebhook") {
-      if (!webhookUrl) return res.status(400).json({ message: "Missing webhookUrl" });
-      const r = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: webhookUrl }),
-      });
-      const j = await r.json();
-      if (!j.ok) return res.status(400).json({ message: j.description || "setWebhook failed" });
-      return res.json({ ok: true, result: "webhook set" });
+      if (action === "setWebhook") {
+        if (!webhookUrl)
+          return res.status(400).json({ message: "Missing webhookUrl" });
+        const r = await fetch(
+          `https://api.telegram.org/bot${token}/setWebhook`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: webhookUrl }),
+          }
+        );
+        const j = await r.json();
+        if (!j.ok)
+          return res
+            .status(400)
+            .json({ message: j.description || "setWebhook failed" });
+        return res.json({ ok: true, result: "webhook set" });
+      }
+
+      const test = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+      const j = await test.json();
+      if (!j.ok)
+        return res
+          .status(400)
+          .json({ message: j.description || "Invalid token" });
+      return res.json({ ok: true, bot: j.result?.username });
     }
 
-    const test = await fetch(`https://api.telegram.org/bot${token}/getMe`);
-    const j = await test.json();
-    if (!j.ok) return res.status(400).json({ message: j.description || "Invalid token" });
-    return res.json({ ok: true, bot: j.result?.username });
+    // --- Twilio test ---
+    if (provider === "twilio") {
+      const { accountSid, authToken, phoneNumber } = creds;
+      if (!accountSid || !authToken || !phoneNumber)
+        return res.status(400).json({ message: "Missing Twilio credentials" });
+
+      try {
+        const client = twilio(accountSid, authToken);
+        const numberInfo = await client.incomingPhoneNumbers.list({
+          phoneNumber,
+          limit: 1,
+        });
+        if (numberInfo.length === 0)
+          return res.status(400).json({ message: "Invalid phone number" });
+
+        return res.json({ ok: true, result: "Twilio connected" });
+      } catch (err) {
+        return res.status(400).json({ message: err.message || "Twilio error" });
+      }
+    }
+
+    res.status(400).json({ message: "Provider not implemented" });
   } catch (e) {
     res.status(500).json({ message: e.message || "Server error" });
   }
 });
 
-// Desconectar
 app.delete("/api/integrations/:provider/disconnect", async (req, res) => {
   try {
     const { provider } = req.params;
     const workspaceId = req.body?.workspaceId || req.query.workspaceId;
 
-    if (!PROVIDERS.includes(provider)) return res.status(400).json({ message: "Invalid provider" });
-    if (!workspaceId) return res.status(400).json({ message: "Missing workspaceId" });
+    if (!PROVIDERS.includes(provider))
+      return res.status(400).json({ message: "Invalid provider" });
+    if (!workspaceId)
+      return res.status(400).json({ message: "Missing workspaceId" });
 
     const { error } = await supabase
       .from("integrations")
@@ -127,11 +171,11 @@ app.delete("/api/integrations/:provider/disconnect", async (req, res) => {
   }
 });
 
-// Estado
 app.get("/api/integrations/status", async (req, res) => {
   try {
     const { workspaceId } = req.query;
-    if (!workspaceId) return res.status(400).json({ message: "Missing workspaceId" });
+    if (!workspaceId)
+      return res.status(400).json({ message: "Missing workspaceId" });
 
     const { data, error } = await supabase
       .from("integrations")
@@ -143,7 +187,9 @@ app.get("/api/integrations/status", async (req, res) => {
     const connected = data?.map((d) => d.provider) || [];
     const status = {};
     PROVIDERS.forEach((p) => {
-      status[p] = connected.includes(p) ? { status: "connected" } : { status: "disconnected" };
+      status[p] = connected.includes(p)
+        ? { status: "connected" }
+        : { status: "disconnected" };
     });
     res.json(status);
   } catch (e) {
@@ -152,7 +198,7 @@ app.get("/api/integrations/status", async (req, res) => {
 });
 
 // ---------- WEBHOOKS ----------
-// --- Telegram ---
+// Telegram webhook (ya estaba)
 app.post("/webhooks/telegram/:workspaceId", async (req, res) => {
   try {
     const { workspaceId } = req.params;
@@ -162,14 +208,18 @@ app.post("/webhooks/telegram/:workspaceId", async (req, res) => {
     if (!creds) return res.sendStatus(403);
 
     const token = creds.bot_token;
-    const chatId = update?.message?.chat?.id || update?.edited_message?.chat?.id;
+    const chatId =
+      update?.message?.chat?.id || update?.edited_message?.chat?.id;
     const text = update?.message?.text || update?.edited_message?.text;
 
     if (chatId && text) {
       await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: chatId, text: `Recibido por Telegram: "${text}"` }),
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: `Recibido por Telegram: "${text}"`,
+        }),
       });
     }
 
@@ -180,6 +230,57 @@ app.post("/webhooks/telegram/:workspaceId", async (req, res) => {
   }
 });
 
+// Twilio WhatsApp webhook
+app.post("/webhooks/twilio/:workspaceId", async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+
+    // Validar firma Twilio
+    const creds = await getCredentials(workspaceId, "twilio");
+    if (!creds) return res.sendStatus(403);
+
+    const { accountSid, authToken } = creds;
+    const twilioSignature = req.headers["x-twilio-signature"];
+    const url = `${process.env.PUBLIC_BASE_URL}/webhooks/twilio/${workspaceId}`;
+    const params = req.body;
+
+    const expectedSignature = twilio.validateRequest(
+      authToken,
+      twilioSignature,
+      url,
+      params
+    );
+
+    if (!expectedSignature) {
+      console.warn("Twilio signature invalid");
+      return res.sendStatus(403);
+    }
+
+    const from = req.body.From;
+    const body = req.body.Body;
+
+    console.log(`Mensaje WhatsApp de ${from}: ${body}`);
+
+    // 🔹 Aquí integras tu IA (Aurora) para generar respuesta
+    const reply = `Recibido por WhatsApp: "${body}"`;
+
+    // Enviar respuesta
+    const client = twilio(accountSid, authToken);
+    await client.messages.create({
+      from: creds.phoneNumber, // Número de WhatsApp de Twilio
+      to: from,
+      body: reply,
+    });
+
+    res.send("<Response></Response>");
+  } catch (e) {
+    console.error("Twilio webhook error:", e.message);
+    res.sendStatus(200);
+  }
+});
+
 // ---------- Server ----------
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
+app.listen(PORT, () =>
+  console.log(`✅ Server running on http://localhost:${PORT}`)
+);
