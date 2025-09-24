@@ -8,8 +8,16 @@ import cors from "cors";
 import twilio from "twilio";
 import crypto from "crypto";
 
+const allowedOrigins = [
+  "http://localhost:3001",   // tu frontend local
+];
+
+
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true, // si usas cookies/tokens
+}));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true })); // Para Twilio webhooks (x-www-form-urlencoded)
 
