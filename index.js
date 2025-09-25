@@ -299,12 +299,14 @@ app.post("/webhooks/twilio/:workspaceId", async (req, res) => {
     const reply = `Recibido por WhatsApp: "${body}"`;
 
     // Enviar respuesta
+    // Enviar respuesta
     const client = twilio(accountSid, authToken);
     await client.messages.create({
-      from: creds.phoneNumber, // Número de WhatsApp de Twilio
-      to: from,
+      from: `whatsapp:${creds.phoneNumber}`, // asegúrate de agregar whatsapp:
+      to: from.startsWith("whatsapp:") ? from : `whatsapp:${from.replace(/^whatsapp:/, "")}`,
       body: reply,
     });
+
 
     res.send("<Response></Response>");
   } catch (e) {
