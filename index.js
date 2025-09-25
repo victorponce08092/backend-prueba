@@ -68,6 +68,7 @@ app.post("/api/integrations/:provider/connect", async (req, res) => {
     if (!workspaceId || !credentials)
       return res.status(400).json({ message: "Missing data" });
 
+    // 🔹 Aquí es donde debes reemplazar tu upsert
     const { error } = await supabase.from("integrations").upsert({
       workspace_id: workspaceId,
       provider,
@@ -75,12 +76,17 @@ app.post("/api/integrations/:provider/connect", async (req, res) => {
       user_id: userId,
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase upsert error:", error); // 👈 agregado
+      throw error; // 👈 agregado
+    }
+
     res.json({ status: "connected" });
   } catch (e) {
     res.status(500).json({ message: e.message || "Server error" });
   }
 });
+
 
 app.post("/api/integrations/:provider/test", async (req, res) => {
   try {
