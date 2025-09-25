@@ -61,24 +61,44 @@ app.post("/api/integrations/:provider/connect", async (req, res) => {
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const { provider } = req.params;
-    const { workspaceId, credentials } = req.body;
+    let { workspaceId, credentials } = req.body;
 
     if (!PROVIDERS.includes(provider))
       return res.status(400).json({ message: "Invalid provider" });
     if (!workspaceId || !credentials)
       return res.status(400).json({ message: "Missing data" });
 
-    // 🔹 Aquí es donde debes reemplazar tu upsert
+    // 🔹 Normalizar credenciales a objeto JSON
+    if (typeof credentials === "string") {
+      try {
+        credentials = JSON.parse(credentials);
+      } catch {
+        return res.status(400).json({ message: "Invalid credentials format" });
+      }
+    }
+
+    // 🔹 Validar por proveedor
+    if (provider === "telegram" && !credentials.bot_token) {
+      return res.status(400).json({ message: "Missing bot_token" });
+    }
+    if (provider === "twilio") {
+      const { accountSid, authToken, phoneNumber } = credentials;
+      if (!accountSid || !authToken || !phoneNumber) {
+        return res.status(400).json({ message: "Missing Twilio credentials" });
+      }
+    }
+
+    // 🔹 Guardar igual que Telegram
     const { error } = await supabase.from("integrations").upsert({
       workspace_id: workspaceId,
       provider,
-      credentials,
+      credentials, // ya es JSON válido
       user_id: userId,
     });
 
     if (error) {
-      console.error("Supabase upsert error:", error); // 👈 agregado
-      throw error; // 👈 agregado
+      console.error("Supabase upsert error:", error);
+      throw error;
     }
 
     res.json({ status: "connected" });
