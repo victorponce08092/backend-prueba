@@ -302,8 +302,8 @@ app.post("/webhooks/twilio/:workspaceId", async (req, res) => {
     // Enviar respuesta
     const client = twilio(accountSid, authToken);
     await client.messages.create({
-      from: `whatsapp:${creds.phoneNumber}`, // asegúrate de agregar whatsapp:
-      to: from.startsWith("whatsapp:") ? from : `whatsapp:${from.replace(/^whatsapp:/, "")}`,
+      from: `whatsapp:${creds.phoneNumber}`, // tu número de Twilio habilitado
+      to: from, // ya viene como "whatsapp:+5217293141857"
       body: reply,
     });
 
