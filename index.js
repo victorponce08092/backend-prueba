@@ -23,7 +23,7 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true })); // Para Twilio webhooks (x-www-form-urlencoded)
 
-app.use("/designs", designsRouter);
+
 
 dotenv.config();
 
@@ -318,6 +318,8 @@ app.post("/webhooks/twilio/:workspaceId", async (req, res) => {
     res.sendStatus(200);
   }
 });
+
+app.use("/designs", designsRouter);
 
 // ---------- Server ----------
 const PORT = process.env.PORT || 3000;
