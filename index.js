@@ -8,6 +8,8 @@ import cors from "cors";
 import twilio from "twilio";
 import crypto from "crypto";
 
+import designsRouter from "./designs.routes.js";
+
 const allowedOrigins = [
   "http://localhost:5001",   // tu frontend local
 ];
@@ -20,6 +22,8 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true })); // Para Twilio webhooks (x-www-form-urlencoded)
+
+app.use("/designs", designsRouter);
 
 dotenv.config();
 
