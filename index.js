@@ -326,10 +326,15 @@ app.post("/api/designs/save", async (req, res) => {
     const { config } = req.body;
     if (!config) return res.status(400).json({ message: "Missing config" });
 
-    const { data, error } = await supabase.from("chatbot_designs").insert({
-      user_id: userId,
-      config
-    }).select().single();
+    // ✅ Usamos upsert para que actualice si ya existe una fila con el mismo user_id
+    const { data, error } = await supabase
+      .from("chatbot_designs")
+      .upsert(
+        { user_id: userId, config },
+        { onConflict: "user_id" } // 👈 clave para que no cree duplicados
+      )
+      .select()
+      .single();
 
     if (error) throw error;
 
@@ -339,6 +344,7 @@ app.post("/api/designs/save", async (req, res) => {
     res.status(500).json({ message: e.message || "Server error" });
   }
 });
+
 
 
 // ---------- Server ----------
