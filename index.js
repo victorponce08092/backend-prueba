@@ -315,6 +315,32 @@ app.post("/webhooks/twilio/:workspaceId", async (req, res) => {
   }
 });
 
+// index.js
+
+// ---------- REST: Chatbot Designs ----------
+app.post("/api/designs/save", async (req, res) => {
+  try {
+    const userId = await getUserIdFromAuth(req);
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const { config } = req.body;
+    if (!config) return res.status(400).json({ message: "Missing config" });
+
+    const { data, error } = await supabase.from("chatbot_designs").insert({
+      user_id: userId,
+      config
+    }).select().single();
+
+    if (error) throw error;
+
+    res.json({ status: "saved", design: data });
+  } catch (e) {
+    console.error("Error saving design:", e);
+    res.status(500).json({ message: e.message || "Server error" });
+  }
+});
+
+
 // ---------- Server ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
