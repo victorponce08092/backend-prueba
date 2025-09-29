@@ -10,16 +10,10 @@ import crypto from "crypto";
 
 import designsRouter from "./designs.routes.js";
 
-const allowedOrigins = [
-  "http://localhost:5001",   // tu frontend local
-];
-
-
-const app = express();
 app.use(cors({
-  origin: allowedOrigins,
-  credentials: true, // si usas cookies/tokens
+  origin: "*"
 }));
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true })); // Para Twilio webhooks (x-www-form-urlencoded)
 
