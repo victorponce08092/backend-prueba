@@ -5,11 +5,25 @@ import { z } from "zod";
 
 const router = express.Router();
 
-// Conexión a Supabase con service key SOLO para DB
+// Cliente de Supabase con SERVICE_KEY (backend)
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY
 );
+
+// ✅ Copiamos el mismo helper de index.js
+async function getUserIdFromAuth(req) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return null;
+
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data?.user) {
+    console.error("Auth error:", error);
+    return null;
+  }
+
+  return data.user.id;
+}
 
 // Validación del payload
 const saveSchema = z.object({
@@ -17,23 +31,6 @@ const saveSchema = z.object({
   config: z.any(),
   previewSnapshot: z.string().max(20000).optional(),
 });
-
-// 🔹 Helper para obtener el userId igual que en index.js
-async function getUserIdFromAuth(req) {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return null;
-
-  // Usamos el cliente con ANON KEY solo para validar token
-  const supabaseAuth = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY
-  );
-
-  const { data, error } = await supabaseAuth.auth.getUser(token);
-  if (error || !data?.user) return null;
-
-  return data.user.id;
-}
 
 // Guardar o actualizar diseño
 router.post("/", async (req, res) => {
@@ -68,7 +65,10 @@ router.post("/", async (req, res) => {
         returning: "representation",
       });
 
-    if (error) return res.status(500).json({ error: "Database error" });
+    if (error) {
+      console.error("Supabase upsert error:", error);
+      return res.status(500).json({ error: "Database error" });
+    }
 
     res.json({ ok: true, design: data?.[0] || null });
   } catch (err) {
