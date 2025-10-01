@@ -376,6 +376,29 @@ app.post("/api/designs/save", async (req, res) => {
   }
 });
 
+// Ruta para obtener diseño por widget_id
+app.get("/api/designs/:widget_id", async (req, res) => {
+  try {
+    const { widget_id } = req.params;
+
+    const { data, error } = await supabase
+      .from("chatbot_designs")
+      .select("config")
+      .eq("widget_id", widget_id)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ message: "Widget no encontrado" });
+    }
+
+    res.json(data); // 🔹 responde con { config: {...} }
+  } catch (e) {
+    console.error("Error en GET /api/designs/:widget_id:", e);
+    res.status(500).json({ message: e.message || "Server error" });
+  }
+});
+
+
 
 app.get("/widget.js", (req, res) => {
   res.sendFile(path.join(__dirname, "widget.js"));
