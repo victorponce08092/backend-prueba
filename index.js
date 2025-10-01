@@ -265,55 +265,59 @@ app.post("/webhooks/telegram/:workspaceId", async (req, res) => {
 });
 
 // Twilio WhatsApp webhook
-app.post("/webhooks/twilio/:workspaceId", async (req, res) => {
+app.post("/api/designs/save", async (req, res) => {
   try {
-    const { workspaceId } = req.params;
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
 
-    // Validar firma Twilio
-    const creds = await getCredentials(workspaceId, "twilio");
-    if (!creds) return res.sendStatus(403);
-
-    const { accountSid, authToken } = creds;
-    const twilioSignature = req.headers["x-twilio-signature"];
-    const url = `${process.env.PUBLIC_BASE_URL}/webhooks/twilio/${workspaceId}`;
-    const params = req.body;
-
-    const expectedSignature = twilio.validateRequest(
-      authToken,
-      twilioSignature,
-      url,
-      params
+    const userClient = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY,
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
     );
 
-    if (!expectedSignature) {
-      console.warn("Twilio signature invalid");
-      return res.sendStatus(403);
+    const { data: userData } = await supabase.auth.getUser(token);
+    if (!userData?.user) return res.status(401).json({ message: "Invalid user" });
+    const userId = userData.user.id;
+
+    const { config } = req.body;
+    if (!config) return res.status(400).json({ message: "Missing config" });
+
+    // 🔹 Obtener diseño existente (para extraer widget_id ya generado por Supabase)
+    let { data: existing } = await userClient
+      .from("chatbot_designs")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+
+    if (!existing?.widget_id) {
+      return res.status(400).json({ message: "widget_id no encontrado en la tabla" });
     }
 
-    const from = req.body.From;
-    const body = req.body.Body;
+    // 🔹 Construir el script embebible usando el widget_id que ya existe
+    const widget_link = `<script src="${process.env.PUBLIC_BASE_URL}/widget.js" data-widget-id="${existing.widget_id}"></script>`;
 
-    console.log(`Mensaje WhatsApp de ${from}: ${body}`);
+    // 🔹 Actualizar config y widget_link
+    const { data, error } = await userClient
+      .from("chatbot_designs")
+      .update({
+        config,
+        widget_link,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId)
+      .select()
+      .single();
 
-    // 🔹 Aquí integras tu IA (Aurora) para generar respuesta
-    const reply = `Recibido por WhatsApp: "${body}"`;
+    if (error) throw error;
 
-    // Enviar respuesta
-    // Enviar respuesta
-    const client = twilio(accountSid, authToken);
-    await client.messages.create({
-      from: `whatsapp:${creds.phoneNumber}`, // tu número de Twilio habilitado
-      to: from, // ya viene como "whatsapp:+5217293141857"
-      body: reply,
-    });
-
-
-    res.send("<Response></Response>");
+    res.json({ status: "saved", design: data });
   } catch (e) {
-    console.error("Twilio webhook error:", e.message);
-    res.sendStatus(200);
+    console.error("Error saving design:", e);
+    res.status(500).json({ message: e.message || "Server error" });
   }
 });
+
 
 // index.js
 
