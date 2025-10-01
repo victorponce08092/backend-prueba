@@ -326,6 +326,9 @@ app.post("/api/designs/save", async (req, res) => {
     const { config } = req.body;
     if (!config) return res.status(400).json({ message: "Missing config" });
 
+    console.log("userId:", userId, "config:", config);
+
+
     // ✅ Usamos upsert para que actualice si ya existe una fila con el mismo user_id
     const { data, error } = await supabase
       .from("chatbot_designs")
