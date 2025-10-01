@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import cors from "cors";
 import twilio from "twilio";
 import crypto from "crypto";
+import { randomUUID } from "crypto";
 
 const allowedOrigins = [
   "http://localhost:5001",   // tu frontend local
@@ -274,65 +275,57 @@ app.post("/webhooks/telegram/:workspaceId", async (req, res) => {
 });
 
 // Twilio WhatsApp webhook
-app.post("/api/designs/save", async (req, res) => {
+app.post("/webhooks/twilio/:workspaceId", async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ message: "Unauthorized" });
+    const { workspaceId } = req.params;
 
-    const userClient = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY,
-      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    // Validar firma Twilio
+    const creds = await getCredentials(workspaceId, "twilio");
+    if (!creds) return res.sendStatus(403);
+
+    const { accountSid, authToken } = creds;
+    const twilioSignature = req.headers["x-twilio-signature"];
+    const url = `${process.env.PUBLIC_BASE_URL}/webhooks/twilio/${workspaceId}`;
+    const params = req.body;
+
+    const expectedSignature = twilio.validateRequest(
+      authToken,
+      twilioSignature,
+      url,
+      params
     );
 
-    const { data: userData } = await supabase.auth.getUser(token);
-    if (!userData?.user) return res.status(401).json({ message: "Invalid user" });
-    const userId = userData.user.id;
-
-    const { config } = req.body;
-    if (!config) return res.status(400).json({ message: "Missing config" });
-
-    // 🔹 Obtener diseño existente (para extraer widget_id ya generado por Supabase)
-    let { data: existing } = await userClient
-      .from("chatbot_designs")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
-
-    if (!existing?.widget_id) {
-      return res.status(400).json({ message: "widget_id no encontrado en la tabla" });
+    if (!expectedSignature) {
+      console.warn("Twilio signature invalid");
+      return res.sendStatus(403);
     }
 
-    // 🔹 Construir el script embebible usando el widget_id que ya existe
-    const widget_link = `<script src="${process.env.PUBLIC_BASE_URL}/widget.js" data-widget-id="${existing.widget_id}"></script>`;
+    const from = req.body.From;
+    const body = req.body.Body;
 
-    // 🔹 Actualizar config y widget_link
-    const { data, error } = await userClient
-      .from("chatbot_designs")
-      .update({
-        config,
-        widget_link,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", userId)
-      .select()
-      .single();
+    console.log(`Mensaje WhatsApp de ${from}: ${body}`);
 
-    if (error) throw error;
+    // 🔹 Aquí integras tu IA (Aurora) para generar respuesta
+    const reply = `Recibido por WhatsApp: "${body}"`;
 
-    res.json({ status: "saved", design: data });
+    // Enviar respuesta
+    // Enviar respuesta
+    const client = twilio(accountSid, authToken);
+    await client.messages.create({
+      from: `whatsapp:${creds.phoneNumber}`, // tu número de Twilio habilitado
+      to: from, // ya viene como "whatsapp:+5217293141857"
+      body: reply,
+    });
+
+
+    res.send("<Response></Response>");
   } catch (e) {
-    console.error("Error saving design:", e);
-    res.status(500).json({ message: e.message || "Server error" });
+    console.error("Twilio webhook error:", e.message);
+    res.sendStatus(200);
   }
 });
 
 
-// index.js
-
-// ---------- REST: Chatbot Designs ----------
-// ---------- REST: Chatbot Designs ----------
-// index.js
 
 app.post("/api/designs/save", async (req, res) => {
   try {
@@ -353,7 +346,16 @@ app.post("/api/designs/save", async (req, res) => {
     const { config } = req.body;
     if (!config) return res.status(400).json({ message: "Missing config" });
 
-    // Upsert con el cliente del usuario (respeta RLS)
+    // 🔹 Primero buscamos si ya existe
+    let { data: existing, error: existingError } = await userClient
+      .from("chatbot_designs")
+      .select("user_id, widget_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    // 🔹 Si no existe, Supabase le asignará automáticamente un widget_id por defecto
     const { data, error } = await userClient
       .from("chatbot_designs")
       .upsert(
@@ -364,12 +366,22 @@ app.post("/api/designs/save", async (req, res) => {
         },
         { onConflict: "user_id" }
       )
-      .select()
+      .select("user_id, widget_id, config")
       .single();
 
     if (error) throw error;
 
-    res.json({ status: "saved", design: data });
+    // 🔹 Construir el widget_link con el widget_id que devuelve Supabase
+    const widget_link = `<script src="${process.env.PUBLIC_BASE_URL}/widget.js" data-widget-id="${data.widget_id}"></script>`;
+
+    // 🔹 Actualizamos el widget_link en la BD (opcional pero recomendable)
+    await userClient
+      .from("chatbot_designs")
+      .update({ widget_link })
+      .eq("user_id", userId);
+
+    // 🔹 Respuesta final
+    res.json({ status: "saved", design: { ...data, widget_link } });
   } catch (e) {
     console.error("Error saving design:", e);
     res.status(500).json({ message: e.message || "Server error" });
