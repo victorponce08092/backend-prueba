@@ -318,6 +318,7 @@ app.post("/webhooks/twilio/:workspaceId", async (req, res) => {
 // index.js
 
 // ---------- REST: Chatbot Designs ----------
+// ---------- REST: Chatbot Designs ----------
 app.post("/api/designs/save", async (req, res) => {
   try {
     const userId = await getUserIdFromAuth(req);
@@ -326,15 +327,16 @@ app.post("/api/designs/save", async (req, res) => {
     const { config } = req.body;
     if (!config) return res.status(400).json({ message: "Missing config" });
 
-    console.log("userId:", userId, "config:", config);
-
-
-    // ✅ Usamos upsert para que actualice si ya existe una fila con el mismo user_id
+    // Guardar/actualizar el diseño con upsert
     const { data, error } = await supabase
       .from("chatbot_designs")
       .upsert(
-        { user_id: userId, config },
-        { onConflict: "user_id" } // 👈 clave para que no cree duplicados
+        {
+          user_id: userId,
+          config,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
       )
       .select()
       .single();
@@ -347,6 +349,7 @@ app.post("/api/designs/save", async (req, res) => {
     res.status(500).json({ message: e.message || "Server error" });
   }
 });
+
 
 
 
