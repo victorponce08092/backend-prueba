@@ -319,16 +319,29 @@ app.post("/webhooks/twilio/:workspaceId", async (req, res) => {
 
 // ---------- REST: Chatbot Designs ----------
 // ---------- REST: Chatbot Designs ----------
+// index.js
+
 app.post("/api/designs/save", async (req, res) => {
   try {
-    const userId = await getUserIdFromAuth(req);
-    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+
+    // cliente con el JWT del usuario
+    const userClient = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY,
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    );
+
+    const { data: userData, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !userData?.user) return res.status(401).json({ message: "Invalid user" });
+    const userId = userData.user.id;
 
     const { config } = req.body;
     if (!config) return res.status(400).json({ message: "Missing config" });
 
-    // Guardar/actualizar el diseño con upsert
-    const { data, error } = await supabase
+    // Upsert con el cliente del usuario (respeta RLS)
+    const { data, error } = await userClient
       .from("chatbot_designs")
       .upsert(
         {
