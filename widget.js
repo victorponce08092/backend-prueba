@@ -8,7 +8,7 @@
   }
 
   // Llamar a tu backend para traer la configuración del diseño
-  fetch(`https://tu-backend.com/api/designs/${widgetId}`)
+  fetch(`https://backend-prueba-production-6838.up.railway.app/api/designs/${widgetId}`)
     .then((res) => res.json())
     .then((data) => {
       if (!data?.config) {
