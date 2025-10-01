@@ -333,7 +333,7 @@ app.post("/api/designs/save", async (req, res) => {
     const { data, error } = await supabase
       .from("chatbot_designs")
       .upsert(
-        { config },
+        { user_id: userId, config },
         { onConflict: "user_id" } // 👈 clave para que no cree duplicados
       )
       .select()
