@@ -12,6 +12,15 @@ const allowedOrigins = [
   "http://localhost:5001",   // tu frontend local
 ];
 
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+
+
+
 
 const app = express();
 app.use(cors({
@@ -368,7 +377,9 @@ app.post("/api/designs/save", async (req, res) => {
 });
 
 
-
+app.get("/widget.js", (req, res) => {
+  res.sendFile(path.join(__dirname, "widget.js"));
+});
 
 // ---------- Server ----------
 const PORT = process.env.PORT || 3000;
