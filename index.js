@@ -381,22 +381,30 @@ app.get("/api/designs/:widget_id", async (req, res) => {
   try {
     const { widget_id } = req.params;
 
+    console.log("Buscando widget_id:", widget_id);
+
     const { data, error } = await supabase
       .from("chatbot_designs")
-      .select("config")
+      .select("config, widget_id")
       .eq("widget_id", widget_id)
-      .single();
+      .maybeSingle();
 
-    if (error || !data) {
+    if (error) {
+      console.error("Supabase error:", error);
+      return res.status(500).json({ message: "Error consultando Supabase" });
+    }
+
+    if (!data) {
       return res.status(404).json({ message: "Widget no encontrado" });
     }
 
-    res.json(data); // 🔹 responde con { config: {...} }
+    res.json(data);
   } catch (e) {
     console.error("Error en GET /api/designs/:widget_id:", e);
     res.status(500).json({ message: e.message || "Server error" });
   }
 });
+
 
 
 
