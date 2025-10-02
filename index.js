@@ -8,6 +8,7 @@ import cors from "cors";
 import twilio from "twilio";
 import crypto from "crypto";
 import { randomUUID } from "crypto";
+import fs from "fs";
 
 const allowedOrigins = [
   "http://localhost:5001",   // tu frontend local
@@ -437,12 +438,10 @@ app.get("/api/designs/:widget_id", async (req, res) => {
 app.get("/widget.js", (req, res) => {
   res.type("application/javascript");
 
-  // Lee el widget base desde disco
-  const fs = require("fs");
   let widgetCode = fs.readFileSync(path.join(__dirname, "widget.js"), "utf8");
 
-  // Reemplaza la variable mágica por la del .env
-  widgetCode = widgetCode.replace("PUBLIC_BASE_URL", process.env.PUBLIC_BASE_URL);
+  // 🔹 Reemplazamos el placeholder PUBLIC_BASE_URL con el valor real del .env
+  widgetCode = widgetCode.replace(/PUBLIC_BASE_URL/g, process.env.PUBLIC_BASE_URL);
 
   res.send(widgetCode);
 });
