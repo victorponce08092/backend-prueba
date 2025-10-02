@@ -435,8 +435,18 @@ app.get("/api/designs/:widget_id", async (req, res) => {
 
 
 app.get("/widget.js", (req, res) => {
-  res.sendFile(path.join(__dirname, "widget.js"));
+  res.type("application/javascript");
+
+  // Lee el widget base desde disco
+  const fs = require("fs");
+  let widgetCode = fs.readFileSync(path.join(__dirname, "widget.js"), "utf8");
+
+  // Reemplaza la variable mágica por la del .env
+  widgetCode = widgetCode.replace("PUBLIC_BASE_URL", process.env.PUBLIC_BASE_URL);
+
+  res.send(widgetCode);
 });
+
 
 // ---------- Server ----------
 const PORT = process.env.PORT || 3000;

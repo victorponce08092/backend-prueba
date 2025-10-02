@@ -7,6 +7,8 @@
     return;
   }
 
+  const BASE_URL = "PUBLIC_BASE_URL";
+
   // 🔹 Diccionario de íconos en SVG
   const ICONS = {
     MessageCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-1.9 5.4 8.5 8.5 0 0 1-6.6 3.1c-1.8 0-3.5-.5-5-1.5L3 20l1.5-4.5c-1-1.5-1.5-3.2-1.5-5A8.5 8.5 0 0 1 11.5 2c2.3 0 4.5.9 6.1 2.5A8.5 8.5 0 0 1 21 11.5z"/></svg>`,
@@ -16,7 +18,7 @@
     Sparkles: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2m0 14v2m9-9h-2M5 12H3m14.07 7.07l-1.41-1.41M6.34 6.34 4.93 4.93m12.73 0-1.41 1.41M6.34 17.66l-1.41 1.41M12 8a4 4 0 0 0 0 8 4 4 0 0 0 0-8z"/></svg>`,
   };
 
-  fetch(`${window.location.origin}/api/designs/${widgetId}`)
+  fetch(`${BASE_URL}/api/designs/${widgetId}`)
     .then((res) => res.json())
     .then((data) => {
       if (!data?.config) {
