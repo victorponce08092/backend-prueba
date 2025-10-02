@@ -9,11 +9,13 @@
 
   const BASE_URL = "PUBLIC_BASE_URL";
 
-  // 🔹 Diccionario de íconos en SVG
-  const ICONS = {
-    MessageCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-1.9 5.4 8.5 8.5 0 0 1-6.6 3.1c-1.8 0-3.5-.5-5-1.5L3 20l1.5-4.5c-1-1.5-1.5-3.2-1.5-5A8.5 8.5 0 0 1 11.5 2c2.3 0 4.5.9 6.1 2.5A8.5 8.5 0 0 1 21 11.5z"/></svg>`,
-    Bot: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="14" height="8" rx="2"/><circle cx="10" cy="3" r="2"/><path d="M10 5v2"/><line x1="7" y1="11" x2="7" y2="11"/><line x1="13" y1="11" x2="13" y2="11"/></svg>`,
-    Send: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
+  // --- SVGs oficiales (Lucide-style) ---
+  // Usamos stroke="currentColor" y viewBox 0 0 24 24 para que escalen exactamente.
+  const SVGS = {
+    MessageCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-1.9 5.4 8.5 8.5 0 0 1-6.6 3.1c-1.8 0-3.5-.5-5-1.5L3 20l1.5-4.5c-1-1.5-1.5-3.2-1.5-5A8.5 8.5 0 0 1 11.5 2c2.3 0 4.5.9 6.1 2.5A8.5 8.5 0 0 1 21 11.5z"/></svg>`,
+    Bot: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>`,
+    Send: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
+    X: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
   };
 
   fetch(`${BASE_URL}/api/designs/${widgetId}`)
@@ -30,190 +32,259 @@
       const fab = document.createElement("button");
       fab.style.position = "fixed";
       fab.style.bottom = "20px";
-      fab.style[config.fab?.position || "right"] = "20px";
-      fab.style.backgroundColor = config.colors?.fabBg || "#000";
+      fab.style[config.fab?.position === "left" ? "left" : "right"] = "20px";
+      // en preview el botón no tiene un ancho fijo, usa padding p-3 y rounded.
+      fab.style.padding = "12px"; // p-3
+      fab.style.backgroundColor = config.colors?.fabBg || "#ffffff";
       fab.style.border = "none";
-      fab.style.borderRadius = config.fab?.shape === "square" ? "12px" : "50%";
-      fab.style.width = "56px";
-      fab.style.height = "56px";
+      fab.style.borderRadius = config.fab?.shape === "square" ? "12px" : "9999px";
       fab.style.display = "flex";
       fab.style.alignItems = "center";
       fab.style.justifyContent = "center";
       fab.style.cursor = "pointer";
       fab.style.zIndex = "999999";
-      fab.style.color = config.colors?.fabBg === "#ffffff" ? "#000" : "#fff";
+      // icon color según fondo del fab
+      fab.style.color = (config.colors?.fabBg || "#ffffff").toLowerCase() === "#ffffff" ? "#000" : "#fff";
+      fab.style.boxShadow = "0 10px 25px rgba(0,0,0,0.15)";
 
-      const chosenIcon = ICONS[config.fab?.icon] || ICONS.MessageCircle;
-      fab.innerHTML = chosenIcon;
+      const fabIcon = SVGS[config.fab?.icon] || SVGS.MessageCircle;
+      // Ajustamos el tamaño del SVG interior para que sea h-5 w-5 (20px)
+      fab.innerHTML = fabIcon.replace(/width="24" height="24"/g, 'width="20" height="20"').replace('stroke="currentColor"', `stroke="${fab.style.color}"`);
       document.body.appendChild(fab);
 
       // --- Iframe del chat ---
       const iframe = document.createElement("iframe");
       iframe.style.position = "fixed";
       iframe.style.bottom = "90px";
-      iframe.style[config.fab?.position || "right"] = "20px";
-      iframe.style.width = "370px";
+      iframe.style[config.fab?.position === "left" ? "left" : "right"] = "20px";
+      iframe.style.width = "384px"; // max-w-sm (24rem)
       iframe.style.height = "540px";
       iframe.style.border = "none";
-      iframe.style.borderRadius = "16px";
+      iframe.style.borderRadius = "12px"; // rounded-xl
       iframe.style.display = "none";
-      iframe.style.boxShadow = "0 4px 16px rgba(0,0,0,0.25)";
+      // Shadow similar to tailwind shadow-xl
+      iframe.style.boxShadow = "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)";
       iframe.style.zIndex = "999999";
       document.body.appendChild(iframe);
 
       const doc = iframe.contentDocument || iframe.contentWindow.document;
       doc.open();
+
+      // Variables CSS rápidas
+      const chatBg = config.colors?.chatBg || "#000000";
+      const textColor = config.colors?.text || "#ffffff";
+      const headerBg = config.colors?.headerBg || "#000000";
+      const headerText = config.colors?.headerText || "#ffffff";
+      const botBubble = config.colors?.botBubble || "#1a1a1a";
+      const userBubble = config.colors?.userBubble || "#ffffff";
+      const radii = config.radii?.bubble || 12;
+
       doc.write(`
         <html>
           <head>
+            <meta name="viewport" content="width=device-width,initial-scale=1" />
             <link href="https://fonts.googleapis.com/css2?family=${config.typography?.family || "Inter"}:wght@300;400;500;600&display=swap" rel="stylesheet">
             <style>
+              :root{
+                --chat-bg: ${chatBg};
+                --text: ${textColor};
+                --header-bg: ${headerBg};
+                --header-text: ${headerText};
+                --bot-bubble: ${botBubble};
+                --user-bubble: ${userBubble};
+                --bubble-radius: ${radii}px;
+              }
+
+              html,body{height:100%;margin:0;padding:0}
               body {
                 margin: 0;
-                font-family: ${config.typography?.family || "Inter"}, sans-serif;
-                background: ${config.colors?.chatBg || "#fff"};
-                color: ${config.colors?.text || "#000"};
+                font-family: ${config.typography?.family || "Inter"}, -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+                background: var(--chat-bg);
+                color: var(--text);
                 display: flex;
                 flex-direction: column;
                 height: 100%;
+                -webkit-font-smoothing:antialiased;
               }
-              .chat-container {
-                display: flex;
-                flex-direction: column;
-                height: 100%;
-                border-radius: 16px;
+
+              /* Card (igual que preview) */
+              .card {
+                width: 100%;
+                max-width: 384px;
+                border-radius: 12px;
                 overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                background: var(--chat-bg);
+                border: 1px solid rgba(255,255,255,0.06); /* border-neutral-700 look */
+                box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+                height: 100%;
               }
+
               .header {
-                background: ${config.colors?.headerBg || "#000"};
-                color: ${config.colors?.headerText || "#fff"};
-                padding: 12px 16px;
+                background: var(--header-bg);
+                color: var(--header-text);
+                padding: 12px 16px; /* px-4 py-3 */
                 font-weight: 600;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
+                display:flex;
+                align-items:center;
+                justify-content:space-between;
               }
+
+              .header .left { display:flex; align-items:center; gap:8px; }
+              .green-dot { width:8px; height:8px; border-radius:9999px; background: #34d399; } /* green-400 */
+              .header .title { font-size:14px; }
+
               .messages {
-                flex: 1;
-                padding: 12px;
-                overflow-y: auto;
+                flex:1;
+                padding: 16px; /* p-4 */
+                overflow-y:auto;
+                min-height:300px;
+                display:flex;
+                flex-direction:column;
+                gap:16px;
               }
-              .botMsg {
-                display: flex;
-                align-items: flex-start;
-                gap: 8px;
-                margin-bottom: 10px;
-              }
+
+              /* Bot message row */
+              .row { display:flex; gap:12px; align-items:flex-start; }
               .botIcon {
-                width: 28px;
-                height: 28px;
-                border-radius: 50%;
-                background: #555;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-shrink: 0;
+                width:28px; height:28px; border-radius:50%;
+                background:#4b5563; /* neutral-600 */
+                display:flex; align-items:center; justify-content:center; flex-shrink:0;
               }
+              .botIcon svg { width:16px; height:16px; color: #fff; }
+
               .botBubble {
-                background: ${config.colors?.botBubble || "#eee"};
-                border-radius: ${config.radii?.bubble || 12}px;
+                background: var(--bot-bubble);
+                border-radius: var(--bubble-radius);
                 padding: 8px 12px;
-                max-width: 80%;
-                font-size: 14px;
+                max-width:80%;
+                font-size:14px;
+                line-height:1.25;
               }
+
+              .userRow { display:flex; justify-content:flex-end; }
               .userBubble {
-                background: ${config.colors?.userBubble || "#ccc"};
-                border-radius: ${config.radii?.bubble || 12}px;
+                background: var(--user-bubble);
+                border-radius: var(--bubble-radius);
                 padding: 8px 12px;
-                margin-bottom: 8px;
-                margin-left: auto;
-                max-width: 80%;
-                font-size: 14px;
+                max-width:80%;
+                font-size:14px;
+                line-height:1.25;
+                color: ${userBubble.toLowerCase() === '#ffffff' ? '#000' : 'var(--text)'};
               }
-              .input {
-                border-top: 1px solid rgba(255,255,255,0.1);
-                padding: 10px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                background: rgba(255,255,255,0.05);
+
+              .inputArea {
+                border-top: 1px solid rgba(255,255,255,0.06);
+                padding: 16px; /* p-4 */
+                background: rgba(255,255,255,0.02);
               }
-              .input input {
-                flex: 1;
-                border: none;
-                outline: none;
-                background: transparent;
-                color: ${config.colors?.text || "#fff"};
-                font-size: 14px;
+
+              .inputInner {
+                display:flex;
+                align-items:center;
+                gap:8px;
+                background: rgba(255,255,255,0.04); /* bg-white/10 */
+                padding: 10px 12px; /* px-3 py-2 */
+                border-radius: 10px;
               }
+
+              .inputInner input {
+                flex:1;
+                background:transparent;
+                border:none;
+                outline:none;
+                color: var(--text);
+                font-size:14px;
+              }
+
               .sendBtn {
                 background: none;
                 border: none;
-                cursor: pointer;
-                color: ${config.colors?.text || "#fff"};
+                padding: 4px;
+                cursor:pointer;
                 display:flex;
                 align-items:center;
                 justify-content:center;
+                color: rgba(255,255,255,0.6); /* text-neutral-400 */
               }
+
+              /* small helpers */
+              .small { font-size:12px; opacity:0.85; }
             </style>
           </head>
           <body>
-            <div class="chat-container">
-              <div class="header">
-                <div style="display:flex;align-items:center;gap:8px">
-                  <div style="width:8px;height:8px;background:limegreen;border-radius:50%"></div>
-                  <span>Asistente</span>
+            <div class="card" role="region" aria-label="chat-widget">
+              <div class="header" role="banner">
+                <div class="left">
+                  <div class="green-dot" aria-hidden="true"></div>
+                  <div class="title">Asistente</div>
                 </div>
-                <button id="closeBtn" style="background:none;border:none;color:inherit;cursor:pointer;">✖</button>
+                <button id="closeBtn" aria-label="Cerrar" style="background:none;border:none;color:inherit;cursor:pointer">${SVGS.X}</button>
               </div>
-              <div class="messages" id="messages">
-                <div class="botMsg">
-                  <div class="botIcon">${ICONS.Bot}</div>
+
+              <div class="messages" id="messages" role="log" aria-live="polite">
+                <div class="row">
+                  <div class="botIcon" aria-hidden="true">${SVGS.Bot}</div>
                   <div class="botBubble">¡Hola! 👋 ¿En qué puedo ayudarte?</div>
                 </div>
               </div>
-              <div class="input">
-                <input id="msgInput" placeholder="Escribe aquí..." />
-                <button id="sendBtn" class="sendBtn">${ICONS.Send}</button>
+
+              <div class="inputArea">
+                <div class="inputInner">
+                  <input id="msgInput" placeholder="Escribe aquí..." aria-label="Mensaje"/>
+                  <button id="sendBtn" class="sendBtn" aria-label="Enviar">${SVGS.Send}</button>
+                </div>
               </div>
             </div>
+
             <script>
-              const messages = document.getElementById("messages");
-              const input = document.getElementById("msgInput");
-              const sendBtn = document.getElementById("sendBtn");
-              const closeBtn = document.getElementById("closeBtn");
+              (function(){
+                const messages = document.getElementById('messages');
+                const input = document.getElementById('msgInput');
+                const sendBtn = document.getElementById('sendBtn');
+                const closeBtn = document.getElementById('closeBtn');
 
-              sendBtn.addEventListener("click", () => {
-                const text = input.value.trim();
-                if (!text) return;
-                const userMsg = document.createElement("div");
-                userMsg.className = "userBubble";
-                userMsg.innerText = text;
-                messages.appendChild(userMsg);
-                input.value = "";
-                messages.scrollTop = messages.scrollHeight;
+                function scrollToBottom(){ messages.scrollTop = messages.scrollHeight; }
 
-                setTimeout(() => {
-                  const botMsg = document.createElement("div");
-                  botMsg.className = "botMsg";
-                  botMsg.innerHTML = \`
-                    <div class="botIcon">${ICONS.Bot}</div>
-                    <div class="botBubble">Recibí: \${text}</div>
-                  \`;
-                  messages.appendChild(botMsg);
-                  messages.scrollTop = messages.scrollHeight;
-                }, 500);
-              });
+                sendBtn.addEventListener('click', () => {
+                  const text = input.value.trim();
+                  if(!text) return;
+                  // user message
+                  const ur = document.createElement('div');
+                  ur.className = 'userRow';
+                  ur.innerHTML = '<div class="userBubble"></div>';
+                  ur.querySelector('.userBubble').innerText = text;
+                  messages.appendChild(ur);
+                  input.value = '';
+                  scrollToBottom();
 
-              closeBtn.addEventListener("click", () => {
-                window.frameElement.style.display = "none";
-              });
+                  // fake bot reply
+                  setTimeout(() => {
+                    const br = document.createElement('div');
+                    br.className = 'row';
+                    br.innerHTML = '<div class="botIcon">${SVGS.Bot.replace(/"/g, '\\"')}</div><div class="botBubble">Recibí: ' + text + '</div>';
+                    messages.appendChild(br);
+                    scrollToBottom();
+                  }, 450);
+                });
+
+                input.addEventListener('keydown', (e) => {
+                  if(e.key === 'Enter') { e.preventDefault(); sendBtn.click(); }
+                });
+
+                closeBtn.addEventListener('click', () => {
+                  // oculta el iframe (mismo comportamiento del preview)
+                  window.frameElement.style.display = 'none';
+                });
+              })();
             </script>
           </body>
         </html>
       `);
       doc.close();
 
+      // toggle
       fab.addEventListener("click", () => {
         iframe.style.display = iframe.style.display === "none" ? "block" : "none";
       });
