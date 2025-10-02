@@ -346,41 +346,51 @@ app.post("/api/designs/save", async (req, res) => {
     const { config } = req.body;
     if (!config) return res.status(400).json({ message: "Missing config" });
 
-    // 🔹 Primero buscamos si ya existe
+    console.log("📝 Intentando guardar diseño para user:", userId);
+    console.log("📝 Config recibido:", JSON.stringify(config));
+
+    // Buscar si ya existe
     let { data: existing, error: existingError } = await userClient
       .from("chatbot_designs")
-      .select("user_id, widget_id")
+      .select("user_id, widget_id, config")
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (existingError) throw existingError;
+    if (existingError) {
+      console.error("⚠️ Error buscando diseño existente:", existingError);
+    } else {
+      console.log("🟢 Diseño existente:", existing);
+    }
 
-    // 🔹 Si no existe, Supabase le asignará automáticamente un widget_id por defecto
+    // Insertar o actualizar
     const { data, error } = await userClient
       .from("chatbot_designs")
       .upsert(
         {
           user_id: userId,
-          config,
+          config: config || {},   // 🔹 nunca null
           updated_at: new Date().toISOString(),
+          widget_id: existing?.widget_id || undefined,
         },
         { onConflict: "user_id" }
       )
       .select("user_id, widget_id, config")
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("❌ Error guardando en Supabase:", error);
+      throw error;
+    }
 
-    // 🔹 Construir el widget_link con el widget_id que devuelve Supabase
+    console.log("✅ Guardado en Supabase:", data);
+
     const widget_link = `<script src="${process.env.PUBLIC_BASE_URL}/widget.js" data-widget-id="${data.widget_id}"></script>`;
 
-    // 🔹 Actualizamos el widget_link en la BD (opcional pero recomendable)
     await userClient
       .from("chatbot_designs")
       .update({ widget_link })
       .eq("user_id", userId);
 
-    // 🔹 Respuesta final
     res.json({ status: "saved", design: { ...data, widget_link } });
   } catch (e) {
     console.error("Error saving design:", e);
@@ -388,12 +398,12 @@ app.post("/api/designs/save", async (req, res) => {
   }
 });
 
+
 // Ruta para obtener diseño por widget_id
 app.get("/api/designs/:widget_id", async (req, res) => {
   try {
     const { widget_id } = req.params;
-
-    console.log("Buscando widget_id:", widget_id);
+    console.log("🔎 Buscando widget_id:", widget_id);
 
     const { data, error } = await supabase
       .from("chatbot_designs")
@@ -402,13 +412,16 @@ app.get("/api/designs/:widget_id", async (req, res) => {
       .maybeSingle();
 
     if (error) {
-      console.error("Supabase error:", error);
+      console.error("❌ Supabase error al leer diseño:", error);
       return res.status(500).json({ message: "Error consultando Supabase" });
     }
 
     if (!data) {
+      console.warn("⚠️ No se encontró widget en la tabla");
       return res.status(404).json({ message: "Widget no encontrado" });
     }
+
+    console.log("🟢 Resultado Supabase:", data);
 
     res.json(data);
   } catch (e) {
@@ -416,6 +429,7 @@ app.get("/api/designs/:widget_id", async (req, res) => {
     res.status(500).json({ message: e.message || "Server error" });
   }
 });
+
 
 
 
