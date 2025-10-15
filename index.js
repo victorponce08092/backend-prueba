@@ -98,6 +98,10 @@ app.post("/api/integrations/:provider/connect", async (req, res) => {
         return res.status(400).json({ message: "Missing Twilio credentials" });
       }
     }
+    if (provider === "web" && !credentials.script) {
+      return res.status(400).json({ message: "Missing web script" });
+    }
+
 
     // 🔹 Guardar igual que Telegram
     const { error } = await supabase.from("integrations").upsert({
@@ -185,6 +189,21 @@ app.post("/api/integrations/:provider/test", async (req, res) => {
         return res.status(400).json({ message: err.message || "Twilio error" });
       }
     }
+
+    // --- Web test ---
+    if (provider === "web") {
+      const creds = await getCredentials(workspaceId, "web");
+      if (!creds || !creds.script)
+        return res.status(400).json({ message: "Missing web script" });
+
+      // Simple validación: verificar que el script tenga la estructura esperada
+      if (!creds.script.includes("<script") || !creds.script.includes("widget.js")) {
+        return res.status(400).json({ message: "Invalid script format" });
+      }
+
+      return res.json({ ok: true, result: "Web integration script valid" });
+    }
+
 
     res.status(400).json({ message: "Provider not implemented" });
   } catch (e) {
