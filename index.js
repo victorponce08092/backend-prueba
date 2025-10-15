@@ -41,7 +41,7 @@ const supabase = createClient(
 );
 
 // Helpers
-const PROVIDERS = ["telegram", "twilio"];
+const PROVIDERS = ["telegram", "twilio", "web"];
 
 async function getCredentials(workspaceId, provider) {
   const { data, error } = await supabase
