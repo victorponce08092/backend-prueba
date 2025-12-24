@@ -41,7 +41,7 @@ const supabase = createClient(
 );
 
 // Helpers
-const PROVIDERS = ["telegram", "twilio", "web"];
+const PROVIDERS = ["telegram", "twilio", "web", "manychat"];
 
 async function getCredentials(workspaceId, provider) {
   const { data, error } = await supabase
@@ -100,6 +100,9 @@ app.post("/api/integrations/:provider/connect", async (req, res) => {
     }
     if (provider === "web" && !credentials.script) {
       return res.status(400).json({ message: "Missing web script" });
+    }
+    if (provider === "manychat" && !credentials.api_token) {
+      return res.status(400).json({ message: "Missing api_token" });
     }
 
 
@@ -202,6 +205,35 @@ app.post("/api/integrations/:provider/test", async (req, res) => {
       }
 
       return res.json({ ok: true, result: "Web integration script valid" });
+    }
+
+    // --- ManyChat test ---
+    if (provider === "manychat") {
+      const creds = await getCredentials(workspaceId, "manychat");
+      if (!creds || !creds.api_token)
+        return res.status(400).json({ message: "Missing api_token" });
+
+      try {
+        // Verificar token llamando a ManyChat API (Page Info)
+        const check = await fetch("https://api.manychat.com/fb/page/getInfo", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${creds.api_token}`,
+            Accept: "application/json",
+          },
+        });
+
+        const j = await check.json();
+        if (j.status !== "success") {
+          return res.status(400).json({
+            message: "ManyChat API Error: " + (j.message || "Unknown error"),
+          });
+        }
+
+        return res.json({ ok: true, result: `ManyChat page: ${j.data?.name || "Unknown"}` });
+      } catch (err) {
+        return res.status(400).json({ message: err.message || "ManyChat connection failed" });
+      }
     }
 
 
@@ -342,6 +374,27 @@ app.post("/webhooks/twilio/:workspaceId", async (req, res) => {
   } catch (e) {
     console.error("Twilio webhook error:", e.message);
     res.sendStatus(200);
+  }
+});
+
+// ManyChat webhook
+app.post("/webhooks/manychat/:workspaceId", async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    console.log(`ManyChat webhook hit for workspace: ${workspaceId}`);
+
+    // ManyChat envía JSON
+    const body = req.body;
+    console.log("ManyChat payload:", JSON.stringify(body, null, 2));
+
+    // Aquí podrías procesar los campos subscriber, messages, etc.
+    // Ej: body.subscriber.id, body.data...
+
+    // Responder con 200 OK para confirmar recepción
+    res.status(200).json({ status: "success" });
+  } catch (e) {
+    console.error("ManyChat webhook error:", e.message);
+    res.status(500).json({ status: "error" });
   }
 });
 
