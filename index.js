@@ -387,21 +387,8 @@ app.post("/webhooks/manychat/:workspaceId", async (req, res) => {
     const body = req.body;
     console.log("ManyChat payload:", JSON.stringify(body, null, 2));
 
-    // Intentar extraer subscriber_id de campos comunes
-    // Nota: En ManyChat "External Request", el usuario define el JSON.
-    // Esperamos que envíen algo como: { "subscriber_id": 123, "message_text": "hola" }
-    // O el formato por defecto full subscriber info si marcan la casilla.
-
-    const subscriberId = body.subscriber_id || body.id || body.user?.id || body.subscriber?.id;
-    const text = body.message_text || body.text || body.last_input_text;
-
-    if (subscriberId && text) {
-      // Obtener credenciales para responder
-      const creds = await getCredentials(workspaceId, "manychat");
-      if (creds && creds.api_token) {
-        await sendManyChatContent(creds.api_token, subscriberId, `Recibido por ManyChat: "${text}"`);
-      }
-    }
+    // Aquí podrías procesar los campos subscriber, messages, etc.
+    // Ej: body.subscriber.id, body.data...
 
     // Responder con 200 OK para confirmar recepción
     res.status(200).json({ status: "success" });
@@ -410,33 +397,6 @@ app.post("/webhooks/manychat/:workspaceId", async (req, res) => {
     res.status(500).json({ status: "error" });
   }
 });
-
-async function sendManyChatContent(token, subscriberId, text) {
-  try {
-    const res = await fetch("https://api.manychat.com/fb/sending/sendContent", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        subscriber_id: subscriberId,
-        data: {
-          version: "v2",
-          content: {
-            type: "text",
-            text: text,
-          },
-        },
-        message_tag: "ACCOUNT_UPDATE", // O "NON_PROMOTIONAL_SUBSCRIPTION" o dependiente del caso
-      }),
-    });
-    const json = await res.json();
-    console.log("ManyChat send result:", json);
-  } catch (err) {
-    console.error("Error sending to ManyChat:", err);
-  }
-}
 
 
 
