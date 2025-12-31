@@ -9,6 +9,7 @@ import twilio from "twilio";
 import crypto from "crypto";
 import { randomUUID } from "crypto";
 import fs from "fs";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const allowedOrigins = [
   "http://localhost:5001",   // tu frontend local
@@ -516,6 +517,67 @@ app.get("/widget.js", (req, res) => {
   widgetCode = widgetCode.replace(/PUBLIC_BASE_URL/g, process.env.PUBLIC_BASE_URL);
 
   res.send(widgetCode);
+});
+
+
+// ---------- Chatbot Endpoint ----------
+app.post("/api/chat/generate", async (req, res) => {
+  try {
+    const { userMessage, recentMessages, context, conversationLog } = req.body;
+
+    // Optional: Check auth
+    // const userId = await getUserIdFromAuth(req);
+    // if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    // Construct messages array for generateContent
+    const parts = [{ text: context }];
+
+    const contents = [
+      {
+        role: "user",
+        parts: [{ text: context }]
+      }
+    ];
+
+    if (Array.isArray(recentMessages)) {
+      recentMessages.slice(-5).forEach(msg => {
+        const role = msg.startsWith("Usuario:") ? "user" : "model";
+        const text = msg.replace(/^(Usuario:|Bot:)\s+/, "").trim();
+        contents.push({
+          role,
+          parts: [{ text }]
+        });
+      });
+    }
+
+    // Add current user message
+    contents.push({
+      role: "user",
+      parts: [{ text: userMessage }]
+    });
+
+    const result = await model.generateContent({
+      contents,
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2048,
+      }
+    });
+
+    const response = await result.response;
+    const text = response.text();
+
+    res.json({ text });
+
+  } catch (error) {
+    console.error("Chat generation error:", error);
+    res.status(500).json({ message: error.message || "Error generating response" });
+  }
 });
 
 
